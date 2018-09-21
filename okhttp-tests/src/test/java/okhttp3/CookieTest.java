@@ -17,12 +17,16 @@ package okhttp3;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import okhttp3.internal.Util;
 import okhttp3.internal.http.HttpDate;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -34,6 +38,37 @@ import static org.junit.Assert.fail;
 
 public final class CookieTest {
   HttpUrl url = HttpUrl.get("https://example.com/");
+
+  @Test public void test() throws Exception{
+    CookieJar cookieJar = new CookieJar() {
+      @Override public void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
+      }
+
+      @Override public List<Cookie> loadForRequest(HttpUrl url) {
+        List<Cookie> cookieList = new ArrayList<>();
+        cookieList.add(Cookie.parse(url, "foo=bar"));
+        return cookieList;
+      }
+    };
+
+    OkHttpClient client = new OkHttpClient.Builder()
+        .cookieJar(cookieJar)
+        .build();
+
+    MockWebServer server = new MockWebServer();
+    server.enqueue(new MockResponse());
+
+    HttpUrl url = server.url("/foo");
+    Request request = new Request.Builder()
+        .get()
+        .url(url)
+        .header("Cookie", "baz=bam")
+        .build();
+    client.newCall(request).execute();
+    
+    RecordedRequest recordedRequest = server.takeRequest();
+    assertEquals("baz=bam", recordedRequest.getHeader("Cookie"));
+  }
 
   @Test public void simpleCookie() throws Exception {
     Cookie cookie = Cookie.parse(url, "SID=31d4d96e407aad42");
